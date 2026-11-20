@@ -1,0 +1,57 @@
+# Kasuje logi każdego zakończonego przebiegu (repo publiczne). WYGENEROWANE (runner_gen.py)
+name: Sprzątanie logów
+on:
+  workflow_run:
+    types: [completed]
+    workflows:
+      - "LAPP - wysyłka zapytań (automatyczna analiza raz w miesiącu)"
+      - "Bot LAPP - grupa"
+      - "Bot LAPP - podłączenie"
+      - "LAPP - czy eShop zaktualizował ceny wg oferty"
+      - "LAPP - diagnostyka cron (tylko odczyt)"
+      - "LAPP - diagnostyka poczty"
+      - "LAPP - diagnostyka Track & Trace (tylko odczyt)"
+      - "LAPP - diagnostyka zapytań (tylko odczyt)"
+      - "LAPP - eShop diagnostyka bota"
+      - "LAPP - eShop diagnostyka dokładnej ceny (tylko odczyt)"
+      - "LAPP - eShop diagnostyka dostępnej ilości (tylko odczyt)"
+      - "LAPP - eShop diagnostyka formatu koszyka (tylko odczyt)"
+      - "LAPP - eShop diagnostyka terminu dostawy (tylko odczyt)"
+      - "LAPP - eShop diagnostyka artykułów"
+      - "LAPP - eShop test logowania i cen"
+      - "LAPP - eShop logowanie (token dla bota)"
+      - "LAPP - eShop wycena zapytań"
+      - "LAPP - eShop zamówienia (diagnostyka, tylko odczyt)"
+      - "LAPP - jednorazowo (ceny eShop z zapytania do grupy)"
+      - "LAPP - kabinet diagnostyka (tylko odczyt)"
+      - "LAPP - komunikat do grupy (od właściciela)"
+      - "LAPP - zamówienie do koszyka eShop (przycisk 🛒 Заказ)"
+      - "LAPP - odświeżenie menu bota (grupa i właściciel)"
+      - "LAPP - pismo o zaległych płatnościach do grupy"
+      - "LAPP - nazwy bota i grupy"
+      - "LAPP - oferta vs ceny eShop (porównanie)"
+      - "LAPP - oferta ponownie (usuń nieaktualne + tabela i ceny eShop do grupy)"
+      - "LAPP - finalny Packing List (Excel) po odpowiedzi magazynu"
+      - "LAPP - ostatni Packing List dla „Упаковано” (zapis wskaźnika w KV)"
+      - "LAPP - prośba o spakowanie (Excel z WZ dla magazynu)"
+      - "LAPP - ponowna wiadomość o paletach (format z WZ)"
+      - "LAPP - podgląd schemy płatności (tylko właściciel)"
+      - "LAPP - ponowny szkic zapytania ofertowego"
+      - "LAPP - proforma (sprawdzenie, do grupy, stan płatności)"
+      - "LAPP - promocje i kody rabatowe (strona LAPP Polska, raz dziennie)"
+      - "LAPP - raporty dla bota"
+      - "LAPP - kabinet i śledzenie dostaw (tylko odczyt)"
+      - "LAPP - test wyceny eShop (tylko log)"
+      - "LAPP - jednorazowa wiadomość bota (ręcznie)"
+      - "Cloudflare - odbiornik botów"
+      - "LAPP - wykres historii cen (na żądanie z bota)"
+      - "LAPP - zapytanie ofertowe od właściciela (od razu)"
+permissions: { actions: write }
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - env: { GH_TOKEN: '${{ github.token }}', ID: '${{ github.event.workflow_run.id }}' }
+        run: |
+          for i in 1 2 3 4 5 6; do gh api -X DELETE repos/${{ github.repository }}/actions/runs/$ID/logs >/dev/null 2>&1 && echo usuniete && exit 0; sleep 10; done; echo nie_udalo_sie

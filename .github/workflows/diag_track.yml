@@ -1,0 +1,19 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/diag_track.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - diagnostyka Track & Trace (tylko odczyt)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs: { nr: { default: '2107201771' } }
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - uses: actions/cache@v4   # 11.11.2026: Chromium z pamięci podręcznej
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-v1
+      - run: pip install -q playwright && bash .github/narzedzia/przygotuj.sh chromium
+      - working-directory: robot
+        run: python3 diag_track.py ${{ inputs.nr }}

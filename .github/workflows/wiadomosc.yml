@@ -1,0 +1,26 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/wiadomosc.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - jednorazowa wiadomość bota (ręcznie)
+# 19.11.2026: np. poprawka w grupie po błędnym komunikacie bota. komu: grupa / wlasciciel
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs:
+      komu: { description: 'grupa albo wlasciciel', required: true, default: 'wlasciciel' }
+      tekst: { description: 'treść', required: true }
+      html: { description: 'tak = parse_mode HTML', required: false, default: 'nie' }
+jobs:
+  w:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - env:
+          TG: ${{ secrets.TELEGRAM_TOKEN }}
+          KOMU: ${{ inputs.komu }}
+          TEKST: ${{ inputs.tekst }}
+          HTML: ${{ inputs.html }}
+        run: |
+          if [ "$KOMU" = "grupa" ]; then C=$(jq -r .grupa_id bot/config.json); else C=$(jq -r .owner_chat_id bot/config.json); fi
+          PM=""; [ "$HTML" = "tak" ] && PM="-d parse_mode=HTML"
+          curl -s -X POST "https://api.telegram.org/bot$TG/sendMessage" -d chat_id=$C $PM --data-urlencode text="$TEKST" | jq -r '.ok, .description // empty'

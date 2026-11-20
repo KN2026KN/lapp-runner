@@ -1,0 +1,32 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/oferta_odnow.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - oferta ponownie (usuń nieaktualne + tabela i ceny eShop do grupy)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs: { nr: { description: 'Numer oferty', required: true } }
+concurrency: { group: oferta, cancel-in-progress: false }
+jobs:
+  o:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - uses: actions/cache@v4   # 11.11.2026: pdftotext z pamięci podręcznej
+        with:
+          path: ~/.cache/apt-poppler
+          key: apt-poppler-${{ runner.os }}-v1
+      - run: bash .github/narzedzia/przygotuj.sh pdf && pip install -q matplotlib playwright
+      - env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          NR: ${{ inputs.nr }}
+        run: python3 robot/oferta_sprzatanie.py
+      - env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          NR: ${{ inputs.nr }}
+          GRUPA: '1'
+          LAPP_SHOP_LOGIN: ${{ secrets.LAPP_SHOP_LOGIN }}
+          LAPP_SHOP_HASLO: ${{ secrets.LAPP_SHOP_HASLO }}
+        run: python3 robot/oferta_porownanie.py

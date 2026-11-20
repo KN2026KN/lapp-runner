@@ -1,0 +1,20 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/wykres_cen.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - wykres historii cen (na żądanie z bota)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs: { art: { description: 'Artykuł', required: true }, chat: { description: 'Czat Telegram', required: true } }
+jobs:
+  w:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - run: pip install -q matplotlib
+      - env:
+          ART: ${{ inputs.art }}
+          CHAT: ${{ inputs.chat }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python3 robot/wykres_cen.py

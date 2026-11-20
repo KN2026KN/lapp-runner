@@ -1,0 +1,14 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/jednorazowo.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - jednorazowo (ceny eShop z zapytania do grupy)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs:
+      wyslij: { description: 'Wysłać (1) czy tylko podgląd (0)', default: '0' }
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          HOOK=$(printf '%s' "${{ secrets.TELEGRAM_TOKEN }}" | sha256sum | cut -c1-48)
+          curl -s -X POST -H "X-Telegram-Bot-Api-Secret-Token: $HOOK" -H "User-Agent: curl/8.5 keura-robot" "https://keura-boty.keura-boty.workers.dev/lapp/jednorazowo?wyslij=${{ inputs.wyslij }}"

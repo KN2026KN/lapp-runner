@@ -1,0 +1,35 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/sledzenie.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - kabinet i śledzenie dostaw (tylko odczyt)
+permissions: { contents: read, actions: write }
+on:
+  schedule:
+    - cron: '10 6,12 * * 1-5'
+    - cron: '10 9 * * 6'
+  workflow_dispatch:
+jobs:
+  s:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - uses: actions/cache@v4   # 11.11.2026: Chromium z pamięci podręcznej
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-v1
+      - run: pip install -q playwright openpyxl && bash .github/narzedzia/przygotuj.sh chromium
+      - name: Kabinet MyLAPP (zamówienia, faktury)
+        env:
+          LAPP_SHOP_LOGIN: ${{ secrets.LAPP_SHOP_LOGIN }}
+          LAPP_SHOP_HASLO: ${{ secrets.LAPP_SHOP_HASLO }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: python3 robot/kabinet.py
+      - run: python3 robot/sledzenie.py
+      - name: Zapis i raporty
+        env: { GH_TOKEN: '${{ github.token }}' }
+        run: |
+          git config user.name "keura-robot"; git config user.email "robot@keura.eu"
+          git add dane/sledzenie.json dane/kabinet.json
+          if git commit -qm "LAPP: śledzenie dostaw"; then
+            git pull --rebase -q || true; git push -q || true
+            gh workflow run raporty.yml --ref main || true
+          fi

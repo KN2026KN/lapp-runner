@@ -1,0 +1,17 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/diag_cron.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - diagnostyka cron (tylko odczyt)
+permissions: { contents: read, actions: write }
+on: workflow_dispatch
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+    steps:
+      - run: |
+          Q='query($a:String!,$s:Time!,$e:Time!){viewer{accounts(filter:{accountTag:$a}){workersInvocationsAdaptive(limit:200,filter:{scriptName:"keura-boty",datetime_geq:$s,datetime_leq:$e},orderBy:[datetimeHour_ASC]){sum{requests errors subrequests} dimensions{datetimeHour status scriptName}}}}}'
+          jq -n --arg q "$Q" '{query:$q, variables:{a:"65af2776afd17487e6801b72986aed5a", s:"2026-11-05T04:00:00Z", e:"2026-11-06T18:59:00Z"}}' > /tmp/q.json
+          curl -s -X POST https://api.cloudflare.com/client/v4/graphql -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' --data @/tmp/q.json | jq -c '.errors, (.data.viewer.accounts[0].workersInvocationsAdaptive[]|[.dimensions.datetimeHour,.dimensions.status,.sum.requests,.sum.errors])' | sed 's/^/== /'
+          Q2='query($a:String!,$s:Time!,$e:Time!){viewer{accounts(filter:{accountTag:$a}){workersInvocationsAdaptive(limit:200,filter:{scriptName:"keura-boty",datetime_geq:$s,datetime_leq:$e,status_neq:"success"}){sum{requests} dimensions{datetime status}}}}}'
+          jq -n --arg q "$Q2" '{query:$q, variables:{a:"65af2776afd17487e6801b72986aed5a", s:"2026-11-06T05:00:00Z", e:"2026-11-06T14:59:00Z"}}' > /tmp/q2.json
+          curl -s -X POST https://api.cloudflare.com/client/v4/graphql -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" -H 'Content-Type: application/json' --data @/tmp/q2.json | jq -c '.errors, (.data.viewer.accounts[0].workersInvocationsAdaptive[]|[.dimensions.datetime,.dimensions.status,.sum.requests])' | head -20 | sed 's/^/== ERR /'

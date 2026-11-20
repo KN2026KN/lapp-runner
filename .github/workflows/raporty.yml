@@ -1,0 +1,180 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/raporty.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - raporty dla bota
+permissions: { contents: read, actions: write }
+on:
+  schedule:
+    - cron: '25 7,14 * * 1-5'
+    - cron: '25 10 * * 6'
+  workflow_dispatch:
+jobs:
+  raporty:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      A: https://api.cloudflare.com/client/v4/accounts/65af2776afd17487e6801b72986aed5a
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}', fetch-depth: 2 }
+      - uses: actions/cache@v4   # 11.11.2026: pdftotext z pamięci podręcznej
+        with:
+          path: ~/.cache/apt-poppler
+          key: apt-poppler-${{ runner.os }}-v1
+      - run: pip install openpyxl && bash .github/narzedzia/przygotuj.sh pdf
+      - name: Odbiór kuriera (z bota) -> historia odbiorów
+        run: |
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          curl -s -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:odbior_plan" > /tmp/plan.json
+          python3 - <<'PY'
+          import json, glob, os, datetime as dt
+          try: plan = json.load(open('/tmp/plan.json'))
+          except Exception: raise SystemExit
+          if not isinstance(plan, dict) or not plan.get('data'): raise SystemExit
+          d = dt.datetime.strptime(plan['data'], '%d.%m.%Y').date()
+          if d >= dt.date.today(): raise SystemExit   # 18.11.2026 (właściciel): „Упаковано” czyścimy dzień po wysłaniu danych kuriera do magazynu
+          L = json.load(open('dane/odbiory.json', encoding='utf-8'))
+          if any(o['data'] == plan['data'] for o in L): raise SystemExit
+          # 19.11.2026 (właściciel): odebrane = finalny packing list magazynu (z kolumną „Paleta”), najnowszy; wersje _v2 po wersji bazowej
+          import re, openpyxl
+          def _k(f): return (dt.datetime.strptime(re.search(r'(\d\d\.\d\d\.\d{4})', os.path.basename(f))[1], '%d.%m.%Y'), os.path.basename(f))
+          def _final(f):
+              try: return any(r and 'Paleta' in [str(x) for x in r if x] for r in openpyxl.load_workbook(f, read_only=True, data_only=True)['Packing List'].iter_rows(values_only=True))
+              except Exception: return False
+          wsz = sorted(glob.glob('dokumenty/Отгрузка/*/Packing_List_Stockrise_*.xlsx'), key=_k)
+          pl = ([f for f in wsz if _final(f)] or wsz)[-1]
+          L.append({'data': plan['data'], 'plik': pl, 'zrodlo': 'dane kuriera wysłane do LAPP z bota', 'palety': plan.get('palety')})
+          json.dump(L, open('dane/odbiory.json', 'w', encoding='utf-8'), ensure_ascii=False, indent=1)
+          print('odbiór dopisany:', plan['data'], pl)
+          PY
+      - name: Potwierdzenia przelewów z grupy LAPP
+        env:
+          TG: ${{ secrets.TELEGRAM_TOKEN }}
+        run: |
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          mkdir -p /tmp/pdf data/log; touch dane/kolejka_zrobione.txt
+          D="dokumenty/Подтверждения оплат (Telegram)"
+          for k in $(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/keys?prefix=lapp:q:&limit=1000" | jq -r '.result[].name'); do
+            grep -qx "$k" dane/kolejka_zrobione.txt && continue
+            curl -s -H "$H" "$A/storage/kv/namespaces/$KV/values/$k" > /tmp/u.json
+            fid=$(jq -r '(.message // .edited_message).document | select(.mime_type=="application/pdf") | .file_id' /tmp/u.json 2>/dev/null)
+            nm=$(jq -r '(.message // .edited_message).document.file_name // ""' /tmp/u.json)
+            # 19.11.2026: przesłane (forward) przez właściciela PDF liczymy także bez „potwierdzenie” w nazwie
+            fw=$(jq -r '(.message // .edited_message) | if (.forward_origin != null or .forward_date != null) and (.from.id|tostring) == "'"$(jq -r .owner_chat_id bot/config.json)"'" then "1" else "" end' /tmp/u.json 2>/dev/null)
+            echo "$nm" | grep -qiE 'подтвержд|potwierdz|operac' || [ -n "$fw" ] || fid=""
+            if [ -n "$fid" ] && [ "$fid" != null ]; then
+              nazwa=$(jq -r '(.message // .edited_message).document.file_name' /tmp/u.json | tr '/' '_')
+              sciezka=$(curl -s "https://api.telegram.org/bot$TG/getFile?file_id=$fid" | jq -r .result.file_path)
+              cel="$D/$nazwa"; [ -f "$cel" ] && cel="$D/${nazwa%.*} ($(date +%s%N | cut -c1-13)).pdf"
+              curl -s -o "$cel" "https://api.telegram.org/file/bot$TG/$sciezka" && cp "$cel" /tmp/pdf/
+            fi
+            echo "$k" >> dane/kolejka_zrobione.txt
+          done
+          # 06.11.2026: potwierdzenia przelewów z banku na e-mail właściciela (most Gmail -> KV lapp:potw:mail:*)
+          for k in $(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/keys?prefix=lapp:potw:mail:&limit=1000" | jq -r '.result[].name'); do
+            grep -qx "$k" dane/kolejka_zrobione.txt && continue
+            curl -s -H "$H" "$A/storage/kv/namespaces/$KV/values/$k" > /tmp/m.json
+            nazwa=$(jq -r '.nazwa' /tmp/m.json | tr '/' '_'); cel="$D/$nazwa"; [ -f "$cel" ] && cel="$D/${nazwa%.*} ($(date +%s%N | cut -c1-13)).pdf"
+            jq -r '.b64' /tmp/m.json | base64 -d > "$cel" && cp "$cel" /tmp/pdf/ && basename "$cel" >> /tmp/zmaila.txt
+            echo "$k" >> dane/kolejka_zrobione.txt; echo "bank (Gmail): $nazwa" | tee -a data/log/raporty.txt
+          done
+          python3 robot/potwierdzenia.py /tmp/pdf > /tmp/nowe.json 2> /tmp/nie.txt; cat /tmp/nie.txt
+          if [ -s /tmp/powtorki.txt ]; then W=$(jq -r .owner_chat_id bot/config.json)
+            curl -s -X POST "https://api.telegram.org/bot$TG/sendMessage" -d chat_id=$W --data-urlencode text="♻️ Уже было засчитано раньше, второй раз не считаю: $(head -5 /tmp/powtorki.txt | tr '\n' ';')" > /dev/null; fi
+          if [ -s /tmp/nie.txt ]; then W=$(jq -r .owner_chat_id bot/config.json)
+            curl -s -X POST "https://api.telegram.org/bot$TG/sendMessage" -d chat_id=$W --data-urlencode text="⚠️ Не смог прочитать подтверждение оплаты (другой формат банка?): $(cat /tmp/nie.txt | head -5)" > /dev/null; fi
+          # 09.11.2026: wpłaty do bota (bez osobnego „Оплата получена” w grupie) - bot po 15 min ciszy pisze Andrzejowi jedno podsumowanie
+          touch /tmp/zmaila.txt
+          HOOK=$(printf '%s' "$TG" | sha256sum | cut -c1-48)
+          W=$(jq -c --rawfile m /tmp/zmaila.txt '[.[] | . + {zrodlo: (if ((.plik) as $p | ($m | split("\n") | index($p))) then "mail" else "grupa" end)}]' /tmp/nowe.json)
+          if [ "$(echo "$W" | jq length)" != 0 ]; then
+            echo "$W" | jq -c '{wplaty: .}' | curl -s -X POST -H "X-Telegram-Bot-Api-Secret-Token: $HOOK" -H "User-Agent: curl/8.5 keura-robot" -H "Content-Type: application/json" --data-binary @- https://keura-boty.keura-boty.workers.dev/lapp/bank/wplaty
+            echo "wpłaty: $W" | tee -a data/log/raporty.txt
+          fi
+      - name: Raporty
+        run: |
+          mkdir -p data/log
+          python3 robot/terminy.py || echo 'terminy: błąd (raporty dalej)'   # 06.11.2026: maile „Update of delivery dates”
+          python3 robot/raporty.py | tee data/log/raporty.txt
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          # zapis tylko zmienionych wartości (limit darmowego KV: 1000 zapisów na dobę)
+          touch dane/kv_hash.txt
+          for k in $(jq -r 'keys[]' dane/raporty.json); do
+            jq -r --arg k "$k" '.[$k]' dane/raporty.json > /tmp/v.txt
+            h="raport:$k $(sha1sum /tmp/v.txt | cut -c1-16)"
+            grep -qxF "$h" dane/kv_hash.txt && continue
+            ok=$(curl -s -X PUT -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:raport:$k" --data-binary @/tmp/v.txt | jq -r .success)
+            echo "{\"k\":\"$k\",\"success\":$ok}" | tee -a data/log/raporty.txt
+            [ "$ok" = true ] && { sed -i "/^raport:$k /d" dane/kv_hash.txt; echo "$h" >> dane/kv_hash.txt; }
+          done
+      - name: Palety (seed z dane/palety.json, tylko gdy w KV brak)
+        run: |
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          git diff --quiet HEAD~1 -- dane/palety.json 2>/dev/null && [ "$(curl -s -o /dev/null -w '%{http_code}' -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:palety")" = 200 ] || \
+            curl -s -X PUT -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:palety" --data-binary @dane/palety.json | jq -c '{palety:.success}'
+          [ "$(curl -s -o /dev/null -w '%{http_code}' -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:watek_magazyn")" = 200 ] || \
+            curl -s -X PUT -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:watek_magazyn" --data-binary "$(jq -r .watek dane/palety.json)" | jq -c '{watek:.success}'
+      - name: PDF faktur i proform do KV (przycisk w bocie)
+        run: |
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          # kopia PDF z poczty (kolejka mail:q) do repo: dokumenty/Почта/<rrrr-mm>/
+          for k in $(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/keys?prefix=mail:q:&limit=1000" | jq -r '.result[].name'); do
+            curl -s -H "$H" "$A/storage/kv/namespaces/$KV/values/$k" > /tmp/m.json
+            jq -e '((.od//"")|ascii_downcase|contains("lapp.com")) or ((.zapytanie//"")|contains("to:lapp.com"))' /tmp/m.json > /dev/null || continue
+            mies=$(jq -r '.data[0:7]' /tmp/m.json); mkdir -p "dokumenty/Почта/$mies"
+            jq -c '.zalaczniki[]?' /tmp/m.json | while read -r z; do
+              n=$(echo "$z" | jq -r .nazwa | tr '/' '_'); f="dokumenty/Почта/$mies/$n"
+              [ -f "$f" ] || echo "$z" | jq -r .b64 | base64 -d > "$f"
+            done
+          done
+          PM=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m); TM=$(date +%Y-%m)
+          for nr in $( (jq -r '.do_zaplaty_nr, .proformy_nr' dane/raporty.json | jq -r '.[] | if type=="object" then .nr else empty end'; jq -r '.faktury_mies' dane/raporty.json | jq -r --arg a "$PM" --arg b "$TM" '(.[$a] // []) + (.[$b] // []) | .[]') | sort -u); do
+            f=$( (find dokumenty/Фактуры -iname "*$nr*.pdf"; find dokumenty -iname "*$nr*.pdf" ! -path "*Подтверждения*" ! -iname "*otwierdzeni*" ! -path "dokumenty/Фактуры/*") | head -1)
+            [ -n "$f" ] || { echo "brak PDF $nr" | tee -a data/log/raporty.txt; continue; }
+            h="pdf:$nr $(sha1sum "$f" | cut -c1-16)"
+            grep -qxF "$h" dane/kv_hash.txt && continue
+            ok=$(curl -s -X PUT -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:pdf:$nr" --data-binary @"$f" | jq -r .success)
+            echo "{\"pdf\":\"$nr\",\"success\":$ok}" | tee -a data/log/raporty.txt
+            [ "$ok" = true ] && { sed -i "/^pdf:$nr /d" dane/kv_hash.txt; echo "$h" >> dane/kv_hash.txt; }
+          done
+      - name: Historia zapytań (🗂 История запросов) + PDF ofert do KV
+        run: |
+          python3 robot/historia_zapytan.py | tail -5 || { echo 'historia zapytań: błąd'; exit 0; }
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          touch dane/kv_hash.txt
+          for k in zapytania zapytania_nr zapytania_szcz; do
+            jq -r --arg k "$k" '.[$k]' dane/raporty.json > /tmp/v.txt
+            h="raport:$k $(sha1sum /tmp/v.txt | cut -c1-16)"; grep -qxF "$h" dane/kv_hash.txt && continue
+            ok=$(curl -s -X PUT -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:raport:$k" --data-binary @/tmp/v.txt | jq -r .success); echo "$k: $ok"
+            [ "$ok" = true ] && { sed -i "/^raport:$k /d" dane/kv_hash.txt; echo "$h" >> dane/kv_hash.txt; }
+          done
+          for nr in $(jq -r '.zapytania_pdf' dane/raporty.json | jq -r '.[]'); do
+            f=$(find dokumenty/Оферты dokumenty/Почта -iname "$nr*.pdf" | head -1); [ -n "$f" ] || continue
+            h="pdf:$nr $(sha1sum "$f" | cut -c1-16)"; grep -qxF "$h" dane/kv_hash.txt && continue
+            ok=$(curl -s -X PUT -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:pdf:$nr" --data-binary @"$f" | jq -r .success); echo "pdf $nr: $ok"
+            [ "$ok" = true ] && { sed -i "/^pdf:$nr /d" dane/kv_hash.txt; echo "$h" >> dane/kv_hash.txt; }
+          done
+      - name: Historia cen (💶 История цен) -> KV lapp:ceny
+        run: |
+          python3 robot/historia_cen.py || { echo 'historia cen: błąd'; exit 0; }
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          touch dane/kv_hash.txt; h="ceny $(sha1sum dane/ceny.json | cut -c1-16)"
+          grep -qxF "$h" dane/kv_hash.txt || { ok=$(curl -s -X PUT -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:ceny" --data-binary @dane/ceny.json | jq -r .success); echo "ceny: $ok"; [ "$ok" = true ] && { sed -i "/^ceny /d" dane/kv_hash.txt; echo "$h" >> dane/kv_hash.txt; }; }
+      - name: Jednostki artykułów z ofert (do zapytań ofertowych)
+        run: |
+          python3 robot/jednostki.py
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          touch dane/kv_hash.txt; h="jednostki $(sha1sum dane/jednostki.json | cut -c1-16)"
+          grep -qxF "$h" dane/kv_hash.txt || { ok=$(curl -s -X PUT -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:jednostki" --data-binary @dane/jednostki.json | jq -r .success); echo "jednostki: $ok"; [ "$ok" = true ] && { sed -i "/^jednostki /d" dane/kv_hash.txt; echo "$h" >> dane/kv_hash.txt; }; }
+      - name: Zapis
+        if: always()
+        run: |
+          git config user.name "keura-robot"; git config user.email "robot@keura.eu"
+          git add dane data/log dokumenty bot; git commit -m "LAPP: raporty dla bota" || true
+          git pull --rebase -q || true; git push || true

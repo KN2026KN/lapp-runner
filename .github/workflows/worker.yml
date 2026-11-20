@@ -1,0 +1,57 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/worker.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: Cloudflare - odbiornik botów
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: 65af2776afd17487e6801b72986aed5a
+      TG: ${{ secrets.TELEGRAM_TOKEN }}
+      GHT: ${{ secrets.PRIV_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - name: Wdrożenie
+        run: |
+          set -e; mkdir -p data/log; LOG=data/log/worker.txt; : > $LOG
+          A=https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          # subdomena workers.dev (jednorazowo)
+          SUB=$(curl -s -H "$H" $A/workers/subdomain | jq -r '.result.subdomain // empty')
+          if [ -z "$SUB" ]; then curl -s -X PUT -H "$H" -H 'content-type: application/json' $A/workers/subdomain -d '{"subdomain":"keura-boty"}' | jq -c '{success,errors}' >> $LOG; SUB=$(curl -s -H "$H" $A/workers/subdomain | jq -r '.result.subdomain // empty'); fi
+          echo "subdomena: $SUB" >> $LOG
+          # magazyn KV
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          if [ -z "$KV" ]; then KV=$(curl -s -X POST -H "$H" -H 'content-type: application/json' $A/storage/kv/namespaces -d '{"title":"keura-boty"}' | jq -r '.result.id'); fi
+          echo "kv: $KV" >> $LOG
+          sed -i "s/__KV_ID__/$KV/" worker/wrangler.toml
+          HOOK=$(printf '%s' "$TG" | sha256sum | cut -c1-48)
+          cd worker
+          npx --yes wrangler@3.99.0 deploy > /tmp/deploy.txt 2>&1 || true
+          grep -v -i token /tmp/deploy.txt | tail -5 >> ../$LOG
+          # 07.11.2026: nieudane wdrożenie ma być widać (czerwony workflow), a nie cicho zostawiać starą wersję
+          grep -q 'Current Version ID' /tmp/deploy.txt || { grep -i -A6 'error' /tmp/deploy.txt | grep -v -i token | head -20; exit 1; }
+          printf '%s' "$TG" | npx --yes wrangler@3.99.0 secret put LAPP_TOKEN 2>&1 | tail -1 >> ../$LOG
+          printf '%s' "$HOOK" | npx --yes wrangler@3.99.0 secret put LAPP_HOOK_SECRET 2>&1 | tail -1 >> ../$LOG
+          if [ -n "$GHT" ]; then printf '%s' "$GHT" | npx --yes wrangler@3.99.0 secret put GH_TOKEN 2>&1 | tail -1 >> ../$LOG; fi
+          cd ..
+          # konfiguracja dostępu do KV
+          # andrey_id: zachowaj ten, który bot zapamiętał sam (gdy Andrzej wszedł do grupy)
+          STARY=$(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:cfg" | jq -r '.andrey_id // empty' 2>/dev/null)
+          jq -c --arg a "$STARY" '{owner_chat_id, grupa_id, andrey_id: (if .andrey_id then .andrey_id elif $a != "" then ($a|tonumber) else null end)}' bot/config.json > /tmp/cfg.json
+          curl -s -X PUT -H "$H" "$A/storage/kv/namespaces/$KV/values/lapp:cfg" --data-binary @/tmp/cfg.json | jq -c '{success}' >> $LOG
+          # webhook Telegrama
+          URL="https://keura-boty.$SUB.workers.dev/lapp"
+          curl -s "https://api.telegram.org/bot$TG/setWebhook" -d "url=$URL" -d "secret_token=$HOOK" -d 'allowed_updates=["message","edited_message","callback_query","my_chat_member"]' | jq -c '{ok,description}' >> $LOG
+          curl -s "https://api.telegram.org/bot$TG/getWebhookInfo" | jq -c '.result|{url,pending_update_count,last_error_message}' >> $LOG
+          cat $LOG
+      - name: Zapis logu
+        if: always()
+        run: |
+          git config user.name "keura-robot"; git config user.email "robot@keura.eu"
+          git checkout -- worker/wrangler.toml || true
+          git add data/log; git commit -m "Cloudflare: log wdrożenia" || true
+          git pull --rebase -q || true; git push || true

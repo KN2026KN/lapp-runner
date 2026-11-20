@@ -1,0 +1,16 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/palety_ponow.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - ponowna wiadomość o paletach (format z WZ)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs:
+      wyslij: { description: 'Wysłać (1) czy podgląd (0)', default: '0' }
+      usun: { description: 'Numer starej wiadomości bota do usunięcia (opcjonalnie)', default: '' }
+      od: { description: 'Szukaj od (nowy - od)', default: '1' }
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          HOOK=$(printf '%s' "${{ secrets.TELEGRAM_TOKEN }}" | sha256sum | cut -c1-48)
+          curl -s -X POST -H "X-Telegram-Bot-Api-Secret-Token: $HOOK" -H "User-Agent: curl/8.5 keura-robot" "https://keura-boty.keura-boty.workers.dev/lapp/palety/ponow?wyslij=${{ inputs.wyslij }}&usun=${{ inputs.usun }}&od=${{ inputs.od }}"

@@ -1,0 +1,30 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/test_wycena.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - test wyceny eShop (tylko log)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs: { poz: { default: '0034305:500 4510922:400 0036320:50' }, tabela: { default: '' }, diag: { default: '' }, koszyk: { default: '' }, liczby: { default: '' }, param: { default: '' }, stany: { default: '' } }
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - uses: actions/cache@v4   # 11.11.2026: Chromium z pamięci podręcznej
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-v1
+      - run: pip install -q playwright matplotlib && bash .github/narzedzia/przygotuj.sh chromium
+      - working-directory: robot
+        env:
+          LAPP_SHOP_LOGIN: ${{ secrets.LAPP_SHOP_LOGIN }}
+          LAPP_SHOP_HASLO: ${{ secrets.LAPP_SHOP_HASLO }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TABELA: ${{ inputs.tabela }}
+          DIAG: ${{ inputs.diag }}
+          KOSZYK: ${{ inputs.koszyk }}
+          LICZBY: ${{ inputs.liczby }}
+          PARAM: ${{ inputs.param }}
+          STANY: ${{ inputs.stany }}
+        run: python test_wycena.py "${{ inputs.poz }}"

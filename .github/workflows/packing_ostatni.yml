@@ -1,0 +1,24 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/packing_ostatni.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - ostatni Packing List dla „Упаковано” (zapis wskaźnika w KV)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs:
+      sciezka: { default: 'dokumenty/Отгрузка/04.11.2026/Packing_List_Stockrise_04.11.2026.xlsx' }
+      data: { default: '04.11.2026' }
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      A: https://api.cloudflare.com/client/v4/accounts/65af2776afd17487e6801b72986aed5a
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - env: { S: '${{ inputs.sciezka }}', D: '${{ inputs.data }}' }
+        run: |
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          jq -nc --arg s "$S" --arg d "$D" '{sciezka:$s, data:$d}' > /tmp/v.json
+          curl -s -X PUT -H "$H" -H 'Content-Type: text/plain' --data-binary @/tmp/v.json "$A/storage/kv/namespaces/$KV/values/lapp:packing:ostatni" | jq -c '{success}'
+          curl -s -X PUT -H "$H" -H 'Content-Type: application/octet-stream' --data-binary @"$S" "$A/storage/kv/namespaces/$KV/values/lapp:packing:plik" | jq -c '{plik: .success}'

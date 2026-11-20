@@ -1,0 +1,22 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/eshop_zamowienia_diag.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - eShop zamówienia (diagnostyka, tylko odczyt)
+permissions: { contents: read, actions: write }
+on: workflow_dispatch
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.12' }
+      - uses: actions/cache@v4   # 11.11.2026: Chromium z pamięci podręcznej
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-v1
+      - run: pip install playwright && bash .github/narzedzia/przygotuj.sh chromium
+      - working-directory: robot
+        env:
+          LAPP_SHOP_LOGIN: ${{ secrets.LAPP_SHOP_LOGIN }}
+          LAPP_SHOP_HASLO: ${{ secrets.LAPP_SHOP_HASLO }}
+        run: python eshop_zamowienia_diag.py

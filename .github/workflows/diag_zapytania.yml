@@ -1,0 +1,22 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/diag_zapytania.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - diagnostyka zapytań (tylko odczyt)
+permissions: { contents: read, actions: write }
+on: workflow_dispatch
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      A: https://api.cloudflare.com/client/v4/accounts/65af2776afd17487e6801b72986aed5a
+    steps:
+      - run: |
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          v(){ echo "== $1: $(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/values/$1" | cut -c1-1500)"; }
+          k(){ echo "== keys $1: $(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/keys?prefix=$1&limit=1000" | jq -c '[.result[].name]')"; }
+          for x in lapp:zap:q lapp:zap:nr lapp:zap:pierwsze lapp:zap:ostatnie lapp:zap:pilne lapp:eshop:tryb lapp:out:lista mail:out:lista; do v $x; done
+          k lapp:zap:okno:; k lapp:out:q:; k lapp:out:szkic:zap; k lapp:eshop:w:; k mail:out; k lapp:out:done
+          for n in $(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/keys?prefix=lapp:out:q:&limit=1000" | jq -r '.result[].name'); do v $n; done
+          for n in $(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/keys?prefix=lapp:eshop:w:&limit=1000" | jq -r '.result[].name' | tail -3); do v $n; done
+          for S in $(curl -s -H "$H" "$A/workers/scripts" | jq -r '.result[].id'); do echo "== cron $S: $(curl -s -H "$H" "$A/workers/scripts/$S/schedules" | jq -c '[.result.schedules[]?|.cron]')"; done
+          echo "== test zapisu KV: $(curl -s -X PUT -H "$H" -H 'Content-Type: text/plain' --data 'x' "$A/storage/kv/namespaces/$KV/values/diag:test?expiration_ttl=120" | jq -c '{success,errors}')"

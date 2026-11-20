@@ -1,0 +1,15 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/zapytanie_reczne.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - zapytanie ofertowe od właściciela (od razu)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs:
+      tekst: { description: 'Pozycje: artykuł ilość [jm], każda w osobnej linii', default: '' }
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - env: { TEKST: '${{ inputs.tekst }}' }
+        run: |
+          HOOK=$(printf '%s' "${{ secrets.TELEGRAM_TOKEN }}" | sha256sum | cut -c1-48)
+          jq -n --arg t "$TEKST" '{tekst:$t}' | curl -s -X POST -H "X-Telegram-Bot-Api-Secret-Token: $HOOK" -H "User-Agent: curl/8.5 keura-robot" -H "Content-Type: application/json" --data-binary @- "https://keura-boty.keura-boty.workers.dev/lapp/zapytanie/reczne"

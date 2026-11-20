@@ -1,0 +1,21 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/nazwy.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - nazwy bota i grupy
+permissions: { contents: read, actions: write }
+on: workflow_dispatch
+jobs:
+  nazwy:
+    runs-on: ubuntu-latest
+    env:
+      TG: ${{ secrets.TELEGRAM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - run: |
+          mkdir -p data/log; L=data/log/nazwy.txt
+          G=$(jq -r .grupa_id bot/config.json)
+          echo "grupa: $(curl -s -X POST "https://api.telegram.org/bot$TG/setChatTitle" -d chat_id=$G --data-urlencode title='LAPP' | jq -c '{ok,description}')" > $L
+          echo "bot: $(curl -s -X POST "https://api.telegram.org/bot$TG/setMyName" --data-urlencode name='Lapp bot' | jq -c '{ok,description}')" >> $L
+          echo "bot teraz: $(curl -s "https://api.telegram.org/bot$TG/getMyName" | jq -c .result)" >> $L
+          cat $L
+          git config user.name "keura-robot"; git config user.email "robot@keura.eu"
+          git add data/log; git commit -m "LAPP: nazwy" || true; git pull --rebase -q || true; git push || true

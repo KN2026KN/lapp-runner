@@ -1,0 +1,12 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/podglad_platnosci.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - podgląd schemy płatności (tylko właściciel)
+permissions: { contents: read, actions: write }
+on: workflow_dispatch
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - env: { TELEGRAM_TOKEN: '${{ secrets.TELEGRAM_TOKEN }}', CLOUDFLARE_API_TOKEN: '${{ secrets.CLOUDFLARE_API_TOKEN }}' }
+        run: python3 -u robot/podglad_platnosci.py

@@ -1,0 +1,16 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/komunikat.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - komunikat do grupy (od właściciela)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs:
+      tekst: { description: 'Tekst', default: '' }
+      usun: { description: 'Numer wiadomości bota do usunięcia', default: '' }
+jobs:
+  j:
+    runs-on: ubuntu-latest
+    steps:
+      - env: { TEKST: '${{ inputs.tekst }}', USUN: '${{ inputs.usun }}' }
+        run: |
+          HOOK=$(printf '%s' "${{ secrets.TELEGRAM_TOKEN }}" | sha256sum | cut -c1-48)
+          jq -n --arg t "$TEKST" --arg u "$USUN" '{tekst:$t, usun:$u}' | curl -s -X POST -H "X-Telegram-Bot-Api-Secret-Token: $HOOK" -H "User-Agent: curl/8.5 keura-robot" -H "Content-Type: application/json" --data-binary @- "https://keura-boty.keura-boty.workers.dev/lapp/grupa/komunikat"

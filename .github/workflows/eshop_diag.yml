@@ -1,0 +1,11 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/eshop_diag.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - eShop diagnostyka bota
+permissions: { contents: read, actions: write }
+on: workflow_dispatch
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          HOOK=$(printf '%s' "${{ secrets.TELEGRAM_TOKEN }}" | sha256sum | cut -c1-48)
+          curl -s -X POST -H "X-Telegram-Bot-Api-Secret-Token: $HOOK" https://keura-boty.keura-boty.workers.dev/lapp/eshop/diag

@@ -1,0 +1,23 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/monit.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - pismo o zaległych płatnościach do grupy
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs:
+      test: { description: '1 = tylko do właściciela (podgląd)', required: false, default: '' }
+      plik: { description: 'pismo z repo (ścieżka PDF), puste = z poczty', required: false, default: '' }
+concurrency: { group: monit, cancel-in-progress: false }
+jobs:
+  m:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - run: sudo apt-get install -y -qq poppler-utils >/dev/null
+      - env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TEST: ${{ inputs.test }}
+          PLIK: ${{ inputs.plik }}
+        run: python3 robot/monit.py

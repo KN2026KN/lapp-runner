@@ -1,0 +1,24 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/eshop_diag_koszyk.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - eShop diagnostyka formatu koszyka (tylko odczyt)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs: { art: { default: '0034305' }, dl: { default: '500' } }
+jobs:
+  d:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - uses: actions/cache@v4   # 11.11.2026: Chromium z pamięci podręcznej
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-v1
+      - run: pip install -q playwright && bash .github/narzedzia/przygotuj.sh chromium
+      - working-directory: robot
+        env:
+          LAPP_SHOP_LOGIN: ${{ secrets.LAPP_SHOP_LOGIN }}
+          LAPP_SHOP_HASLO: ${{ secrets.LAPP_SHOP_HASLO }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: python eshop_diag_koszyk.py ${{ inputs.art }} ${{ inputs.dl }}
