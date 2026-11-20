@@ -1,0 +1,26 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/kv_odczyt.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - odczyt klucza KV do repo (diagnostyka)
+# 20.11.2026: repo publiczne kasuje logi - wartość klucza zapisujemy w prywatnym repo (data/log/kv/<klucz>.json)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs:
+      klucz: { description: 'klucz KV, np. lapp:koszyk:ostatni', required: true }
+jobs:
+  k:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - env:
+          T: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          K: ${{ inputs.klucz }}
+          A: https://api.cloudflare.com/client/v4/accounts/65af2776afd17487e6801b72986aed5a
+        run: |
+          NS=$(curl -s -H "Authorization: Bearer $T" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty").id')
+          mkdir -p data/log/kv; f="data/log/kv/$(echo "$K" | tr ':/' '__').json"
+          curl -s -H "Authorization: Bearer $T" "$A/storage/kv/namespaces/$NS/values/$K" > "$f"
+          git config user.name 'lapp-robot'; git config user.email 'robot@keura.eu'
+          git add data/log/kv; git commit -qm "KV: $K" || true
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
