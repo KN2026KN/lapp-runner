@@ -66,7 +66,7 @@ jobs:
               nazwa=$(jq -r '(.message // .edited_message).document.file_name' /tmp/u.json | tr '/' '_')
               sciezka=$(curl -s "https://api.telegram.org/bot$TG/getFile?file_id=$fid" | jq -r .result.file_path)
               cel="$D/$nazwa"; [ -f "$cel" ] && cel="$D/${nazwa%.*} ($(date +%s%N | cut -c1-13)).pdf"
-              curl -s -o "$cel" "https://api.telegram.org/file/bot$TG/$sciezka" && cp "$cel" /tmp/pdf/
+              curl -s -o "$cel" "https://api.telegram.org/file/bot$TG/$sciezka" && cp "$cel" /tmp/pdf/ && printf '%s\t%s\n' "$(basename "$cel")" "$fid" >> /tmp/pdf/fid.tsv   # 20.11.2026: plik -> file_id (dokładny załącznik do maila LAPP)
             fi
             echo "$k" >> dane/kolejka_zrobione.txt
           done
