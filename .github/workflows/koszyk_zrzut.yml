@@ -9,12 +9,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-v1
+      - run: pip install -q playwright && bash .github/narzedzia/przygotuj.sh chromium
       - working-directory: robot
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-        run: python koszyk_zrzut.py > /dev/null
+          LAPP_SHOP_LOGIN: ${{ secrets.LAPP_SHOP_LOGIN }}
+          LAPP_SHOP_HASLO: ${{ secrets.LAPP_SHOP_HASLO }}
+        run: python koszyk_zrzut.py > /dev/null 2> ../data/log/koszyk_zrzut_blad.txt || true
       - run: |
           git config user.name 'lapp-robot'; git config user.email 'robot@keura.eu'
-          git add data/log/koszyk_zrzut.json; git commit -qm "Zrzut koszyka eShop" || true
+          git add data/log/koszyk_zrzut*; git commit -qm "Zrzut koszyka eShop" || true
           for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
