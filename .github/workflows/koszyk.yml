@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       tryb: { description: 'nowy | dodaj | wyczysc', required: false, default: 'nowy' }
+      tekst: { description: '20.11.2026: zamówienie tekstem (artykuł ilość jm, linia po linii) - zapisywane jako lapp:zam:zlecenie', required: false, default: '' }
 concurrency: { group: eshop-koszyk, cancel-in-progress: false }
 jobs:
   k:
@@ -25,7 +26,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
           TRYB: ${{ inputs.tryb }}
-        run: python koszyk.py
+          TEKST: ${{ inputs.tekst }}
+        run: |
+          if [ -n "$TEKST" ]; then python3 -c "import json,os,sys; sys.path.insert(0,'.'); src=open('eshop_wycena.py').read().replace('\nmain()','\n'); ns={'__file__':os.path.abspath('eshop_wycena.py'),'__name__':'x'}; exec(compile(src,'eshop_wycena.py','exec'),ns); ns['kv_put']('lapp:zam:zlecenie', json.dumps({'tekst': os.environ['TEKST']}, ensure_ascii=False), None)"; fi
+          python koszyk.py
       - run: |
           git config user.name 'lapp-robot'; git config user.email 'robot@keura.eu'
           git add dokumenty/CSV
