@@ -1,0 +1,20 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/koszyk_zrzut.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - zrzut koszyka eShop do repo (tylko odczyt)
+permissions: { contents: read, actions: write }
+on: { workflow_dispatch: {} }
+jobs:
+  z:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - working-directory: robot
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+        run: python koszyk_zrzut.py > /dev/null
+      - run: |
+          git config user.name 'lapp-robot'; git config user.email 'robot@keura.eu'
+          git add data/log/koszyk_zrzut.json; git commit -qm "Zrzut koszyka eShop" || true
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
