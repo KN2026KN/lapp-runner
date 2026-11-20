@@ -94,7 +94,21 @@ jobs:
       - name: Raporty
         run: |
           mkdir -p data/log
+          H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
+          KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
+          # 20.11.2026: kopia PDF z poczty PRZED raportem (terminy z nowego Potwierdzenia zamówienia od razu w „Заказано”)
+          # kopia PDF z poczty (kolejka mail:q) do repo: dokumenty/Почта/<rrrr-mm>/
+          for k in $(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/keys?prefix=mail:q:&limit=1000" | jq -r '.result[].name'); do
+            curl -s -H "$H" "$A/storage/kv/namespaces/$KV/values/$k" > /tmp/m.json
+            jq -e '((.od//"")|ascii_downcase|contains("lapp.com")) or ((.zapytanie//"")|contains("to:lapp.com"))' /tmp/m.json > /dev/null || continue
+            mies=$(jq -r '.data[0:7]' /tmp/m.json); mkdir -p "dokumenty/Почта/$mies"
+            jq -c '.zalaczniki[]?' /tmp/m.json | while read -r z; do
+              n=$(echo "$z" | jq -r .nazwa | tr '/' '_'); f="dokumenty/Почта/$mies/$n"
+              [ -f "$f" ] || echo "$z" | jq -r .b64 | base64 -d > "$f"
+            done
+          done
           python3 robot/terminy.py || echo 'terminy: błąd (raporty dalej)'   # 06.11.2026: maile „Update of delivery dates”
+          python3 robot/potw_terminy.py || echo 'potw_terminy: błąd (raporty dalej)'   # 20.11.2026: terminy z Potwierdzenia zamówienia
           python3 robot/raporty.py | tee data/log/raporty.txt
           H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
           KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
@@ -120,16 +134,6 @@ jobs:
         run: |
           H="Authorization: Bearer $CLOUDFLARE_API_TOKEN"
           KV=$(curl -s -H "$H" "$A/storage/kv/namespaces?per_page=100" | jq -r '.result[]|select(.title=="keura-boty")|.id')
-          # kopia PDF z poczty (kolejka mail:q) do repo: dokumenty/Почта/<rrrr-mm>/
-          for k in $(curl -s -H "$H" "$A/storage/kv/namespaces/$KV/keys?prefix=mail:q:&limit=1000" | jq -r '.result[].name'); do
-            curl -s -H "$H" "$A/storage/kv/namespaces/$KV/values/$k" > /tmp/m.json
-            jq -e '((.od//"")|ascii_downcase|contains("lapp.com")) or ((.zapytanie//"")|contains("to:lapp.com"))' /tmp/m.json > /dev/null || continue
-            mies=$(jq -r '.data[0:7]' /tmp/m.json); mkdir -p "dokumenty/Почта/$mies"
-            jq -c '.zalaczniki[]?' /tmp/m.json | while read -r z; do
-              n=$(echo "$z" | jq -r .nazwa | tr '/' '_'); f="dokumenty/Почта/$mies/$n"
-              [ -f "$f" ] || echo "$z" | jq -r .b64 | base64 -d > "$f"
-            done
-          done
           PM=$(date -d "$(date +%Y-%m-01) -1 day" +%Y-%m); TM=$(date +%Y-%m)
           for nr in $( (jq -r '.do_zaplaty_nr, .proformy_nr' dane/raporty.json | jq -r '.[] | if type=="object" then .nr else empty end'; jq -r '.faktury_mies' dane/raporty.json | jq -r --arg a "$PM" --arg b "$TM" '(.[$a] // []) + (.[$b] // []) | .[]') | sort -u); do
             f=$( (find dokumenty/Фактуры -iname "*$nr*.pdf"; find dokumenty -iname "*$nr*.pdf" ! -path "*Подтверждения*" ! -iname "*otwierdzeni*" ! -path "dokumenty/Фактуры/*") | head -1)
