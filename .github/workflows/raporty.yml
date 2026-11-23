@@ -94,7 +94,7 @@ jobs:
       - name: Odblokowanie zamówienia po opłacie wszystkich faktur (dane/odblokuj.json)
         env:
           TG: ${{ secrets.TELEGRAM_TOKEN }}
-        run: python3 robot/odblokuj.py || echo 'odblokuj: błąd (raporty dalej)'
+        run: python3 robot/odblokuj.py || echo 'odblokuj - błąd, raporty dalej'
       - name: Raporty
         run: |
           mkdir -p data/log
