@@ -27,7 +27,7 @@ on:
       - "LAPP - komunikat do grupy (od właściciela)"
       - "LAPP - zamówienie do koszyka eShop (przycisk 🛒 Заказ)"
       - "LAPP - kod rabatowy przez stronę koszyka (sprawdzenie)"
-      - "LAPP - sprawdzenie kodu rabatowego w koszyku (kod zdejmowany)"
+      - "LAPP - kod rabatowy w koszyku (zostaw=tak - kod zostaje w koszyku do zamówienia)"
       - "LAPP - zrzut koszyka eShop do repo (tylko odczyt)"
       - "LAPP - odczyt klucza KV do repo (diagnostyka)"
       - "LAPP - odświeżenie menu bota (grupa i właściciel)"

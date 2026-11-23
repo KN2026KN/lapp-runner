@@ -1,10 +1,11 @@
 # WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/koszyk_voucher.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
-name: LAPP - sprawdzenie kodu rabatowego w koszyku (kod zdejmowany)
+name: LAPP - kod rabatowy w koszyku (zostaw=tak - kod zostaje w koszyku do zamówienia)
 permissions: { contents: read, actions: write }
 on:
   workflow_dispatch:
     inputs:
       kod: { description: kod rabatowy, required: true, default: IC5 }
+      zostaw: { description: 'tak = kod zostaje w koszyku', required: false, default: 'nie' }
 jobs:
   z:
     runs-on: ubuntu-latest
@@ -24,7 +25,7 @@ jobs:
           LAPP_SHOP_LOGIN: ${{ secrets.LAPP_SHOP_LOGIN }}
           LAPP_SHOP_HASLO: ${{ secrets.LAPP_SHOP_HASLO }}
           KOD: ${{ inputs.kod }}
-          KODY: ic5,Ic5,IC10,IC-5,IC05
+          ZOSTAW: ${{ inputs.zostaw }}
         run: python koszyk_voucher.py > /dev/null 2> ../data/log/koszyk_voucher_blad.txt || true
       - run: |
           git config user.name 'lapp-robot'; git config user.email 'robot@keura.eu'
