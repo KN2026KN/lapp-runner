@@ -24,6 +24,7 @@ jobs:
           LAPP_SHOP_LOGIN: ${{ secrets.LAPP_SHOP_LOGIN }}
           LAPP_SHOP_HASLO: ${{ secrets.LAPP_SHOP_HASLO }}
           KOD: ${{ inputs.kod }}
+          KODY: ic5,Ic5,IC10,IC-5,IC05
         run: python koszyk_voucher.py > /dev/null 2> ../data/log/koszyk_voucher_blad.txt || true
       - run: |
           git config user.name 'lapp-robot'; git config user.email 'robot@keura.eu'
