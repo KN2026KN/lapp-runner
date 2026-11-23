@@ -8,7 +8,7 @@ on:
 jobs:
   z:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
