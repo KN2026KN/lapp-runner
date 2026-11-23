@@ -91,6 +91,10 @@ jobs:
             echo "$W" | jq -c '{wplaty: .}' | curl -s -X POST -H "X-Telegram-Bot-Api-Secret-Token: $HOOK" -H "User-Agent: curl/8.5 keura-robot" -H "Content-Type: application/json" --data-binary @- https://keura-boty.keura-boty.workers.dev/lapp/bank/wplaty
             echo "wpłaty: $W" | tee -a data/log/raporty.txt
           fi
+      - name: Odblokowanie zamówienia po opłacie wszystkich faktur (dane/odblokuj.json)
+        env:
+          TG: ${{ secrets.TELEGRAM_TOKEN }}
+        run: python3 robot/odblokuj.py || echo 'odblokuj: błąd (raporty dalej)'
       - name: Raporty
         run: |
           mkdir -p data/log
