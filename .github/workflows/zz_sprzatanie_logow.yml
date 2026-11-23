@@ -26,6 +26,7 @@ on:
       - "LAPP - kabinet diagnostyka (tylko odczyt)"
       - "LAPP - komunikat do grupy (od właściciela)"
       - "LAPP - zamówienie do koszyka eShop (przycisk 🛒 Заказ)"
+      - "LAPP - sprawdzenie kodu rabatowego w koszyku (kod zdejmowany)"
       - "LAPP - zrzut koszyka eShop do repo (tylko odczyt)"
       - "LAPP - odczyt klucza KV do repo (diagnostyka)"
       - "LAPP - odświeżenie menu bota (grupa i właściciel)"
