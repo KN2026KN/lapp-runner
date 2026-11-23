@@ -46,6 +46,7 @@ on:
       - "LAPP - raporty dla bota"
       - "LAPP - kabinet i śledzenie dostaw (tylko odczyt)"
       - "LAPP - test wyceny eShop (tylko log)"
+      - "LAPP - poprawienie wiadomości bota w grupie (edycja, bez usuwania)"
       - "LAPP - jednorazowa wiadomość bota (ręcznie)"
       - "Cloudflare - odbiornik botów"
       - "LAPP - wykres historii cen (na żądanie z bota)"

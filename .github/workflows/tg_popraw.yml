@@ -1,0 +1,26 @@
+# WYGENEROWANE z KN2026KN/keura-lapp .github/workflows/tg_popraw.yml (runner_gen.py) - zmiany robić w prywatnym repo i generować ponownie
+name: LAPP - poprawienie wiadomości bota w grupie (edycja, bez usuwania)
+permissions: { contents: read, actions: write }
+on:
+  workflow_dispatch:
+    inputs:
+      szukaj: { description: fragment tekstu błędnej wiadomości, required: true }
+      tekst: { description: nowa treść (HTML), required: true }
+jobs:
+  p:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with: { repository: KN2026KN/keura-lapp, token: '${{ secrets.PRIV_TOKEN }}' }
+      - working-directory: robot
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          SZUKAJ: ${{ inputs.szukaj }}
+          TEKST: ${{ inputs.tekst }}
+        run: python tg_popraw.py > ../wynik.txt 2>&1 || true
+      - run: |
+          mkdir -p data/log && cp wynik.txt data/log/tg_popraw.txt
+          git config user.name 'lapp-robot'; git config user.email 'robot@keura.eu'
+          git add data/log/tg_popraw.txt; git commit -qm "Poprawka wiadomości bota" || true
+          for i in 1 2 3; do git pull --rebase -q && git push -q && break; sleep 5; done
